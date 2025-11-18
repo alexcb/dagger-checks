@@ -13,10 +13,6 @@ inputs:
     description: "Dagger progress format"
     required: false
     default: "dots"
-  dagger-flags:
-    description: "Dagger CLI Flags"
-    required: false
-    default: ""
   workdir:
     description: "The working directory in which to run the Dagger CLI"
     required: false
@@ -33,36 +29,55 @@ inputs:
     description: "Filter to apply to checks"
     required: false
     default: "**"
-  summary-path:
-    description: "File path to write the job summary"
-    required: false
-    default: ""
-  enable-github-summary:
-    description: "Whether to write summary to GITHUB_STEP_SUMMARY"
-    required: false
-    default: "false"
-outputs:
-  output:
-    description: "Job output"
-    value: ${{ steps.exec.outputs.stdout }}
-  traceURL:
-    description: "Dagger Cloud trace URL"
-    value: ${{ steps.exec.outputs.traceURL }}
 runs:
   using: "composite"
   steps:
-    # Not all inputs are available in last tagged release. So we pin to main as of 2025-nov-17
-    - uses: dagger/dagger-for-github@662d9b66af7c40b8745fb3131785a53129193ffe
+    - shell: bash
+      run: |
+        set -o pipefail
+        # Fallback to /usr/local for backwards compatability
+        prefix_dir="${RUNNER_TEMP:-/usr/local}"
+        # Ensure the dir is writable otherwise fallback to tmpdir
+        if [[ ! -d "$prefix_dir" ]] || [[ ! -w "$prefix_dir" ]]; then
+            prefix_dir="$(mktemp -d)"
+        fi
+        printf '%s/bin' "$prefix_dir" >> $GITHUB_PATH
+
+        # If the dagger version is 'latest', set the version back to an empty
+        # string. This allows the install script to detect and install the latest
+        # version itself
+        VERSION=${{ inputs.version }}
+        if [[ "$VERSION" == "latest" ]]; then
+          VERSION=
+        elif [[ -n "$VERSION" && "$VERSION" != v* ]]; then
+          # Add 'v' prefix if version doesn't start with 'v' and is not empty
+          VERSION="v$VERSION"
+        fi
+        latest=$(curl https://dl.dagger.io/dagger/versions/latest)
+
+        COMMIT=${{ inputs.commit }}
+
+        if [[ -x "$(command -v dagger)" ]]; then
+          echo "::group::Checking dagger"
+          version="$(dagger --silent version | cut --fields 2 --delimiter ' ')"
+          echo "Found existing dagger version: $version"
+          if [[ "$version" == "$VERSION" ]] || [[ "$version" == "$latest" ]]; then
+            echo "dagger ${version} is already installed, skipping installation"
+            exit 0
+          fi
+          echo "::endgroup::"
+        fi
+
+        echo "::group::Installing dagger"
+        curl -fsSL https://dl.dagger.io/dagger/install.sh | \
+        BIN_DIR=${prefix_dir}/bin DAGGER_VERSION="$VERSION" DAGGER_COMMIT="$COMMIT" sh
+        echo "::endgroup::"
+    - id: exec
+      shell: bash
       env:
+        DAGGER_MODULE: ${{ inputs.module }}
         DAGGER_PROGRESS: ${{ inputs.progress }}
-      with:
-        verb: checks
-        args: ${{ inputs.filter }}
-        version: ${{ inputs.version }}
-        commit: ${{ inputs.commit }}
-        dagger-flags: ${{ inputs.dagger-flags }}
-        workdir: ${{ inputs.workdir }}
-        cloud-token: ${{ inputs.cloud-token }}
-        module: ${{ inputs.module }}
-        summary-path: ${{ inputs.summary-path }}
-        enable-github-summary: ${{ inputs.enable-github-summary }}
+        DAGGER_CLOUD_TOKEN: ${{ inputs.cloud-token }}
+      run: |
+        cd ${{ inputs.workdir }}
+        dagger checks '${{ inputs.filter }}'
