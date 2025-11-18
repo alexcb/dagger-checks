@@ -47,7 +47,8 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - uses: dagger/dagger-for-github@v8.2.0
+    # Not all inputs are available in last tagged release. So we pin to main as of 2025-nov-17
+    - uses: dagger/dagger-for-github@d809c269da643e2a9e56163b6d295c75ecb05f7a
       with:
         verb: checks
         args: ${{ inputs.filter }}
