@@ -9,10 +9,14 @@ inputs:
     description: "Dagger Dev Commit"
     required: false
     default: ""
+  progress:
+    description: "Dagger progress format"
+    required: false
+    default: "dots"
   dagger-flags:
     description: "Dagger CLI Flags"
     required: false
-    default: "--progress plain"
+    default: ""
   workdir:
     description: "The working directory in which to run the Dagger CLI"
     required: false
@@ -49,6 +53,8 @@ runs:
   steps:
     # Not all inputs are available in last tagged release. So we pin to main as of 2025-nov-17
     - uses: dagger/dagger-for-github@662d9b66af7c40b8745fb3131785a53129193ffe
+      env:
+        DAGGER_PROGRESS: ${{ inputs.progress }}
       with:
         verb: checks
         args: ${{ inputs.filter }}
