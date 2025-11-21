@@ -79,5 +79,13 @@ runs:
         DAGGER_PROGRESS: ${{ inputs.progress }}
         DAGGER_CLOUD_TOKEN: ${{ inputs.cloud-token }}
       run: |
+        echo DEBUG
+        echo --- env ---
+        env
+        echo --- pwd ---
+        pwd
+        echo --- .docker ---
+        find ~ -name .docker
+        echo -------
         cd ${{ inputs.workdir }}
         dagger checks '${{ inputs.filter }}'
