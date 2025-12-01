@@ -89,7 +89,7 @@ runs:
         echo -------
         cd ${{ inputs.workdir }}
         dagger checks '${{ inputs.filter }}'
-    - id: failure debug
+    - name: failure debug
       shell: bash
       run: docker ps -a && docker ps -q | xargs -n 1 docker logs
       if: ${{ failure() }}
